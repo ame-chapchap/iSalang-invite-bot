@@ -136,7 +136,7 @@ if (!TOKEN) {
     process.exit(1);
 }
 
-console.log(`🔑 トークン形式チェック: ${TOKEN.startsWith('MTE') ? '✅ 正常' : '❌ 異常'}`);
+console.log(`🔑 トークン形式チェック: ${TOKEN.startsWith('MT') ? '✅ 正常' : '❌ 異常'}`);
 console.log(`📏 トークン長: ${TOKEN.length}文字`);
 
 // ログイン試行（詳細エラーハンドリング）
