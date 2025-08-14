@@ -1,3 +1,10 @@
+// DNS解決をIPv4優先に設定（Render環境対策）
+import dns from "dns";
+dns.setDefaultResultOrder("ipv4first");
+
+// または環境変数での設定（Renderの Environment に追加）
+// NODE_OPTIONS = --dns-result-order=ipv4first
+
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 
