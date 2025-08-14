@@ -2,9 +2,6 @@
 import dns from "dns";
 dns.setDefaultResultOrder("ipv4first");
 
-// または環境変数での設定（Renderの Environment に追加）
-// NODE_OPTIONS = --dns-result-order=ipv4first
-
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 
@@ -44,6 +41,16 @@ const INVITE_CODE = process.env.INVITE_CODE;
 
 // 招待情報を保存する変数
 let cachedInvites = new Map();
+
+// ===== ここに詳細ログを追加 =====
+// プロセスエラーハンドリング
+process.on("unhandledRejection", (e) => console.error("🚨 UNHANDLED REJECTION:", e));
+process.on("uncaughtException", (e) => console.error("🚨 UNCAUGHT EXCEPTION:", e));
+
+// Discord.js 詳細ログ
+client.on("shardError", (e, id) => console.error("🚨 SHARD ERROR", id, e));
+client.on("debug", (m) => console.log("🔍 [discord.js]", m));
+// ===== 詳細ログ追加終了 =====
 
 // Bot起動時
 client.once('ready', async () => {
