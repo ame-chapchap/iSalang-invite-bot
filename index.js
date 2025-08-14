@@ -1,26 +1,20 @@
 const { Client, GatewayIntentBits } = require('discord.js');
-const express = require('express');
+require('dotenv').config();
 
-// Express サーバーを作成（Renderのポート要件のため）
-const app = express();
-const PORT = process.env.PORT || 3000;
+// ===== 設定セクション =====
+// ここで招待コードとロールIDの対応を設定してください
+const INVITE_ROLE_CONFIG = {
+    // 'invite_code': 'role_id'
+    // 例：
+    // 'abc123': '1234567890123456789',  // VIPメンバー用
+    // 'def456': '9876543210987654321',  // 一般メンバー用
+    
+    // ⚠️ 下記を実際の招待コードとロールIDに置き換えてください ⚠️
+    // 'YOUR_INVITE_CODE_1': 'YOUR_ROLE_ID_1',
+    // 'YOUR_INVITE_CODE_2': 'YOUR_ROLE_ID_2',
+};
 
-app.get('/', (req, res) => {
-    res.send('🤖 iSalang招待ロールBot is running!');
-});
-
-app.listen(PORT, () => {
-    console.log(`🌐 HTTP server is running on port ${PORT}`);
-});
-
-// 環境変数の確認（デバッグ用）
-console.log('🔍 環境変数チェック:');
-console.log(`- DISCORD_TOKEN: ${process.env.DISCORD_TOKEN ? '設定済み (' + process.env.DISCORD_TOKEN.substring(0, 10) + '...)' : '❌ 未設定'}`);
-console.log(`- GUILD_ID: ${process.env.GUILD_ID || '❌ 未設定'}`);
-console.log(`- ROLE_ID: ${process.env.ROLE_ID || '❌ 未設定'}`);
-console.log(`- INVITE_CODE: ${process.env.INVITE_CODE || '❌ 未設定'}`);
-
-// Discord Bot部分
+// ===== Botクライアント初期化 =====
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -29,141 +23,142 @@ const client = new Client({
     ]
 });
 
-// 環境変数から取得
-const TOKEN = process.env.DISCORD_TOKEN;
-const GUILD_ID = process.env.GUILD_ID;
-const ROLE_ID = process.env.ROLE_ID;
-const INVITE_CODE = process.env.INVITE_CODE;
+// 招待リンクのキャッシュ（サーバーごと）
+const serverInvites = new Map();
 
-// 招待情報を保存する変数
-let cachedInvites = new Map();
-
-// Bot起動時
+// ===== Bot起動時の処理 =====
 client.once('ready', async () => {
-    console.log(`✅ ${client.user.tag} でログインしました！`);
-    console.log(`📊 Bot ID: ${client.user.id}`);
-    console.log(`🏠 参加サーバー数: ${client.guilds.cache.size}`);
+    console.log(`🤖 ${client.user.tag} がオンラインになりました！`);
+    console.log(`📊 ${client.guilds.cache.size} のサーバーに接続中`);
     
-    // 既存の招待情報をキャッシュ
-    const guild = client.guilds.cache.get(GUILD_ID);
-    if (guild) {
-        console.log(`🎯 対象サーバー見つかりました: ${guild.name}`);
-        const invites = await guild.invites.fetch();
-        invites.forEach(invite => cachedInvites.set(invite.code, invite.uses));
-        console.log(`📊 招待情報をキャッシュしました: ${invites.size}個`);
-        
-        // 対象ロールの確認
-        const targetRole = guild.roles.cache.get(ROLE_ID);
-        if (targetRole) {
-            console.log(`🎭 対象ロール見つかりました: ${targetRole.name}`);
-        } else {
-            console.log(`❌ 対象ロールが見つかりません: ${ROLE_ID}`);
-        }
-    } else {
-        console.log(`❌ 対象サーバーが見つかりません: ${GUILD_ID}`);
-    }
-});
-
-// Discord接続エラーハンドリング（詳細版）
-client.on('error', (error) => {
-    console.error('❌ Discord Client エラー:', error);
-});
-
-client.on('warn', (warning) => {
-    console.warn('⚠️ Discord Client 警告:', warning);
-});
-
-client.on('disconnect', () => {
-    console.log('🔌 Discord接続が切断されました');
-});
-
-client.on('reconnecting', () => {
-    console.log('🔄 Discord再接続中...');
-});
-
-// メンバー参加時
-client.on('guildMemberAdd', async (member) => {
-    console.log(`👋 新しいメンバーが参加: ${member.user.tag}`);
-    
-    if (member.guild.id !== GUILD_ID) {
-        console.log(`ℹ️ 別のサーバーからの参加: ${member.guild.name}`);
-        return;
-    }
-
-    try {
-        // 現在の招待情報を取得
-        const newInvites = await member.guild.invites.fetch();
-        
-        // 使用された招待コードを特定
-        const usedInvite = newInvites.find(invite => {
-            const cachedUses = cachedInvites.get(invite.code) || 0;
-            return invite.uses > cachedUses;
-        });
-
-        if (usedInvite) {
-            console.log(`🔗 使用された招待コード: ${usedInvite.code}`);
-            console.log(`🎯 対象招待コード: ${INVITE_CODE}`);
+    // 全サーバーの招待リンクをキャッシュ
+    for (const guild of client.guilds.cache.values()) {
+        try {
+            const invites = await guild.invites.fetch();
+            const inviteMap = new Map();
             
-            if (usedInvite.code === INVITE_CODE) {
-                // 指定された招待コードの場合、ロールを付与
-                const role = member.guild.roles.cache.get(ROLE_ID);
+            invites.forEach(invite => {
+                inviteMap.set(invite.code, invite.uses || 0);
+            });
+            
+            serverInvites.set(guild.id, inviteMap);
+            console.log(`✅ ${guild.name}: ${invites.size}個の招待リンクをキャッシュ`);
+            
+        } catch (error) {
+            console.error(`❌ ${guild.name} の招待リンク取得失敗:`, error.message);
+        }
+    }
+    
+    console.log('🚀 準備完了！新メンバーの参加を監視中...');
+    console.log('📝 設定確認:', Object.keys(INVITE_ROLE_CONFIG).length, '個の招待コードが設定済み');
+});
+
+// ===== 新メンバー参加時の処理 =====
+client.on('guildMemberAdd', async (member) => {
+    console.log(`👋 ${member.user.tag} が ${member.guild.name} に参加しました`);
+    
+    try {
+        const guild = member.guild;
+        const cachedInvites = serverInvites.get(guild.id);
+        
+        if (!cachedInvites) {
+            console.log('❌ キャッシュされた招待リンクが見つかりません');
+            return;
+        }
+        
+        // 現在の招待リンク一覧を取得
+        const currentInvites = await guild.invites.fetch();
+        
+        // 使用回数が増えた招待リンクを特定
+        let usedInviteCode = null;
+        
+        for (const [code, currentUses] of currentInvites) {
+            const cachedUses = cachedInvites.get(code) || 0;
+            
+            if (currentUses > cachedUses) {
+                usedInviteCode = code;
+                console.log(`🔍 使用された招待コード: ${code} (${cachedUses} → ${currentUses})`);
+                break;
+            }
+        }
+        
+        if (usedInviteCode) {
+            // 招待コードに対応するロールを取得
+            const roleId = INVITE_ROLE_CONFIG[usedInviteCode];
+            
+            if (roleId) {
+                const role = guild.roles.cache.get(roleId);
+                
                 if (role) {
-                    await member.roles.add(role);
-                    console.log(`✅ ${member.user.tag} に「${role.name}」ロールを付与しました！`);
+                    try {
+                        await member.roles.add(role);
+                        console.log(`✅ ${member.user.tag} に "${role.name}" ロールを付与しました`);
+                        
+                        // ウェルカムDM送信（オプション）
+                        try {
+                            await member.send(`🎉 **${guild.name}** へようこそ！\n自動的に **${role.name}** ロールを付与しました。`);
+                            console.log(`📨 ${member.user.tag} にウェルカムメッセージを送信しました`);
+                        } catch (dmError) {
+                            console.log(`📨 ${member.user.tag} へのDM送信失敗（DMが無効の可能性）`);
+                        }
+                        
+                    } catch (roleError) {
+                        console.error(`❌ ロール付与失敗:`, roleError.message);
+                    }
                 } else {
-                    console.log(`❌ ロールが見つかりません: ${ROLE_ID}`);
+                    console.log(`⚠️ ロールID "${roleId}" が見つかりません`);
                 }
             } else {
-                console.log(`ℹ️ ${member.user.tag} は別の招待コード（${usedInvite.code}）から参加しました`);
+                console.log(`ℹ️ 招待コード "${usedInviteCode}" にロールが設定されていません`);
             }
         } else {
-            console.log(`❓ 使用された招待コードを特定できませんでした`);
+            console.log('❓ 使用された招待リンクを特定できませんでした');
         }
-
+        
         // キャッシュを更新
-        newInvites.forEach(invite => cachedInvites.set(invite.code, invite.uses));
-
+        const newInviteMap = new Map();
+        currentInvites.forEach(invite => {
+            newInviteMap.set(invite.code, invite.uses || 0);
+        });
+        serverInvites.set(guild.id, newInviteMap);
+        
     } catch (error) {
-        console.error('❌ エラーが発生しました:', error);
+        console.error('❌ メンバー参加処理エラー:', error);
     }
 });
 
-// Botにログイン（詳細ログ版）
-console.log('🚀 Discord Botログイン試行中...');
+// ===== 招待リンク作成時のキャッシュ更新 =====
+client.on('inviteCreate', (invite) => {
+    const guildInvites = serverInvites.get(invite.guild.id) || new Map();
+    guildInvites.set(invite.code, invite.uses || 0);
+    serverInvites.set(invite.guild.id, guildInvites);
+    console.log(`➕ 新しい招待リンク作成: ${invite.code}`);
+});
 
-if (!TOKEN) {
-    console.error('❌ DISCORD_TOKENが設定されていません！');
+// ===== 招待リンク削除時のキャッシュ更新 =====
+client.on('inviteDelete', (invite) => {
+    const guildInvites = serverInvites.get(invite.guild.id);
+    if (guildInvites) {
+        guildInvites.delete(invite.code);
+        console.log(`➖ 招待リンク削除: ${invite.code}`);
+    }
+});
+
+// ===== エラーハンドリング =====
+client.on('error', (error) => {
+    console.error('🚨 Discord.js エラー:', error);
+});
+
+process.on('unhandledRejection', (error) => {
+    console.error('🚨 未処理エラー:', error);
+});
+
+// ===== Bot起動 =====
+if (!process.env.DISCORD_TOKEN) {
+    console.error('❌ DISCORD_TOKEN が設定されていません！');
+    console.error('💡 Railway の環境変数で DISCORD_TOKEN を設定してください');
     process.exit(1);
 }
 
-console.log(`🔑 トークン形式チェック: ${TOKEN.startsWith('MT') ? '✅ 正常' : '❌ 異常'}`);
-console.log(`📏 トークン長: ${TOKEN.length}文字`);
-
-// ログイン試行（詳細エラーハンドリング）
-client.login(TOKEN)
-    .then(() => {
-        console.log('🎉 Discord ログイン成功！');
-    })
-    .catch(error => {
-        console.error('❌❌❌ Discord ログイン失敗 ❌❌❌');
-        console.error('エラータイプ:', error.name);
-        console.error('エラーメッセージ:', error.message);
-        console.error('エラーコード:', error.code);
-        console.error('完全なエラー:', error);
-        
-        // 一般的なエラーの原因を説明
-        if (error.code === 'TOKEN_INVALID') {
-            console.error('💡 解決方法: Discord Developer Portalでトークンを再生成してください');
-        } else if (error.code === 'DISALLOWED_INTENTS') {
-            console.error('💡 解決方法: Discord Developer PortalでPrivileged Gateway Intentsを有効にしてください');
-        }
-    });
-
-// 10秒後にログイン状態をチェック
-setTimeout(() => {
-    if (client.readyAt) {
-        console.log('✅ Discord Bot正常稼働中');
-    } else {
-        console.log('❌ Discord Bot未接続（10秒経過）');
-    }
-}, 10000);
+console.log('🔄 Discord Bot を起動中...');
+client.login(process.env.DISCORD_TOKEN);
