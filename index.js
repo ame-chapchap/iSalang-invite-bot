@@ -1,5 +1,5 @@
 // DNS解決をIPv4優先に設定（Render環境対策）
-import dns from "dns";
+const dns = require("dns");
 dns.setDefaultResultOrder("ipv4first");
 
 const { Client, GatewayIntentBits } = require('discord.js');
