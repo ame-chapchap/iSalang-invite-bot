@@ -141,7 +141,7 @@ client.on('guildMemberAdd', async (member) => {
     }
 });
 
-// Botにログイン（詳細ログ版）
+// Botにログイン（超詳細ログ版）
 console.log('🚀 Discord Botログイン試行中...');
 
 if (!TOKEN) {
@@ -154,40 +154,57 @@ console.log(`🔑 トークン形式チェック: ${TOKEN.startsWith('MT') ? '�
 console.log(`📏 トークン長: ${TOKEN.length}文字`);
 console.log(`🔤 トークン先頭: ${TOKEN.substring(0, 15)}...`);
 
-// ログイン試行（詳細エラーハンドリング）
+// 接続前のWebSocket状態
+console.log(`🔌 接続前WebSocket状態: ${client.ws.status}`);
+
+// ログイン処理にタイムアウトを設定
+const loginTimeout = setTimeout(() => {
+    console.error('⏰ ログイン処理がタイムアウトしました（30秒）');
+    console.error('🔍 現在のWebSocket状態:', client.ws.status);
+}, 30000);
+
+// ログイン試行（超詳細エラーハンドリング）
+console.log('🎯 client.login()を実行中...');
+
 client.login(TOKEN)
     .then(() => {
-        console.log('🎉 Discord ログイン成功！');
+        clearTimeout(loginTimeout);
+        console.log('🎉 Discord ログイン処理完了！');
     })
     .catch(error => {
+        clearTimeout(loginTimeout);
         console.error('❌❌❌ Discord ログイン失敗 ❌❌❌');
         console.error('エラータイプ:', error.name);
         console.error('エラーメッセージ:', error.message);
         console.error('エラーコード:', error.code);
-        console.error('ステータス:', error.status);
-        console.error('レスポンス:', error.response);
-        console.error('完全なエラー:', JSON.stringify(error, null, 2));
+        console.error('エラースタック:', error.stack);
         
-        // 一般的なエラーの原因を説明
-        if (error.code === 'TOKEN_INVALID') {
+        // ネットワーク関連のエラーチェック
+        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+            console.error('💡 ネットワーク接続の問題です');
+        } else if (error.code === 'TOKEN_INVALID') {
             console.error('💡 解決方法: Discord Developer Portalでトークンを再生成してください');
-        } else if (error.code === 'DISALLOWED_INTENTS') {
-            console.error('💡 解決方法: Discord Developer PortalでPrivileged Gateway Intentsを有効にしてください');
-        } else if (error.message && error.message.includes('401')) {
-            console.error('💡 解決方法: Botトークンが無効です。新しいトークンを生成してください');
-        } else if (error.message && error.message.includes('403')) {
-            console.error('💡 解決方法: Bot権限またはアクセス権限に問題があります');
         }
     });
 
-// 10秒後にログイン状態をチェック
+// 段階的な状態チェック
+setTimeout(() => {
+    console.log(`🔍 5秒後WebSocket状態: ${client.ws.status}`);
+}, 5000);
+
+setTimeout(() => {
+    console.log(`🔍 15秒後WebSocket状態: ${client.ws.status}`);
+    console.log(`🔍 Bot準備状態: ${client.readyAt ? '準備完了' : '未準備'}`);
+}, 15000);
+
 setTimeout(() => {
     if (client.readyAt) {
         console.log('✅ Discord Bot正常稼働中');
     } else {
-        console.log('❌ Discord Bot未接続（10秒経過）');
-        console.log('🔍 デバッグ情報:');
+        console.log('❌ Discord Bot未接続（25秒経過）');
+        console.log('🔍 最終デバッグ情報:');
         console.log(`- WebSocket状態: ${client.ws.status}`);
         console.log(`- Bot準備状態: ${client.readyAt ? '準備完了' : '未準備'}`);
+        console.log(`- ユーザー情報: ${client.user ? client.user.tag : '未取得'}`);
     }
-}, 10000);
+}, 25000);
