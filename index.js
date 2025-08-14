@@ -64,13 +64,21 @@ client.once('ready', async () => {
     }
 });
 
-// Discord接続エラーハンドリング
+// Discord接続エラーハンドリング（詳細版）
 client.on('error', (error) => {
     console.error('❌ Discord Client エラー:', error);
 });
 
 client.on('warn', (warning) => {
     console.warn('⚠️ Discord Client 警告:', warning);
+});
+
+client.on('disconnect', () => {
+    console.log('🔌 Discord接続が切断されました');
+});
+
+client.on('reconnecting', () => {
+    console.log('🔄 Discord再接続中...');
 });
 
 // メンバー参加時
@@ -120,12 +128,42 @@ client.on('guildMemberAdd', async (member) => {
     }
 });
 
-// Botにログイン
+// Botにログイン（詳細ログ版）
 console.log('🚀 Discord Botログイン試行中...');
+
 if (!TOKEN) {
     console.error('❌ DISCORD_TOKENが設定されていません！');
-} else {
-    client.login(TOKEN).catch(error => {
-        console.error('❌ Discord ログインエラー:', error);
-    });
+    process.exit(1);
 }
+
+console.log(`🔑 トークン形式チェック: ${TOKEN.startsWith('MTE') ? '✅ 正常' : '❌ 異常'}`);
+console.log(`📏 トークン長: ${TOKEN.length}文字`);
+
+// ログイン試行（詳細エラーハンドリング）
+client.login(TOKEN)
+    .then(() => {
+        console.log('🎉 Discord ログイン成功！');
+    })
+    .catch(error => {
+        console.error('❌❌❌ Discord ログイン失敗 ❌❌❌');
+        console.error('エラータイプ:', error.name);
+        console.error('エラーメッセージ:', error.message);
+        console.error('エラーコード:', error.code);
+        console.error('完全なエラー:', error);
+        
+        // 一般的なエラーの原因を説明
+        if (error.code === 'TOKEN_INVALID') {
+            console.error('💡 解決方法: Discord Developer Portalでトークンを再生成してください');
+        } else if (error.code === 'DISALLOWED_INTENTS') {
+            console.error('💡 解決方法: Discord Developer PortalでPrivileged Gateway Intentsを有効にしてください');
+        }
+    });
+
+// 10秒後にログイン状態をチェック
+setTimeout(() => {
+    if (client.readyAt) {
+        console.log('✅ Discord Bot正常稼働中');
+    } else {
+        console.log('❌ Discord Bot未接続（10秒経過）');
+    }
+}, 10000);
