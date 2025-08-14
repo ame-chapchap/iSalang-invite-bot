@@ -1,14 +1,14 @@
 {
   "name": "isalang-invite-bot",
   "version": "1.0.0",
-  "description": "Discord invite role bot for iSalang server",
+  "description": "Discord bot that assigns roles based on invite links",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
-    "express": "^4.18.2"
+    "dotenv": "^16.3.1"
   },
   "engines": {
     "node": "18.x"
