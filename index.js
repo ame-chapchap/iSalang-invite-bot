@@ -1,5 +1,19 @@
 const { Client, GatewayIntentBits } = require('discord.js');
+const express = require('express');
 
+// Express サーバーを作成（Renderのポート要件のため）
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+    res.send('🤖 iSalang招待ロールBot is running!');
+});
+
+app.listen(PORT, () => {
+    console.log(`🌐 HTTP server is running on port ${PORT}`);
+});
+
+// Discord Bot部分
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
