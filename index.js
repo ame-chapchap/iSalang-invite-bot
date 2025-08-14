@@ -1,3 +1,34 @@
+// 一番上に追加（環境変数チェックの前）
+console.log('🔍 Discord API接続テスト開始...');
+
+// A. Gateway接続テスト
+const https = require('https');
+https.get("https://discord.com/api/v10/gateway", (res) => {
+    console.log("✅ GATEWAY到達成功:", res.statusCode);
+    let data = "";
+    res.on("data", (chunk) => (data += chunk));
+    res.on("end", () => console.log("📊 GATEWAY応答:", data));
+}).on("error", (e) => console.error("❌ GATEWAY到達失敗:", e.message));
+
+// B. Bot Gateway接続テスト（環境変数取得後に移動）
+setTimeout(() => {
+    const token = process.env.DISCORD_TOKEN;
+    if (token) {
+        const req = https.request(
+            "https://discord.com/api/v10/gateway/bot",
+            { method: "GET", headers: { Authorization: `Bot ${token}` } },
+            (res) => {
+                console.log("✅ BOT GATEWAY到達成功:", res.statusCode);
+                let data = "";
+                res.on("data", (c) => (data += c));
+                res.on("end", () => console.log("📊 BOT GATEWAY応答:", data));
+            }
+        );
+        req.on("error", (e) => console.error("❌ BOT GATEWAY到達失敗:", e.message));
+        req.end();
+    }
+}, 2000);
+
 // DNS解決をIPv4優先に設定（Render環境対策）
 const dns = require("dns");
 dns.setDefaultResultOrder("ipv4first");
