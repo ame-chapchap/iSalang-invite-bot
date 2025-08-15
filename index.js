@@ -31,29 +31,92 @@ client.once('ready', async () => {
     console.log(`🤖 ${client.user.tag} がオンラインになりました！`);
     console.log(`📊 ${client.guilds.cache.size} のサーバーに接続中`);
     
+    // 🔍 設定されている招待コードを詳細表示
+    console.log('\n⚙️ === 設定確認 ===');
+    console.log(`📝 設定されている招待コード数: ${Object.keys(INVITE_ROLE_CONFIG).length}個`);
+    
+    if (Object.keys(INVITE_ROLE_CONFIG).length > 0) {
+        console.log('📋 招待コード→ロール設定一覧:');
+        for (const [inviteCode, roleId] of Object.entries(INVITE_ROLE_CONFIG)) {
+            console.log(`  🔗 招待コード: ${inviteCode} → ロールID: ${roleId}`);
+            console.log(`     招待リンク: https://discord.gg/${inviteCode}`);
+        }
+    } else {
+        console.log('⚠️ 招待コードが設定されていません！');
+    }
+    
+    console.log('\n🔍 === サーバー別招待リンク情報 ===');
+    
     // 全サーバーの招待リンクをキャッシュ
     for (const guild of client.guilds.cache.values()) {
         try {
+            console.log(`\n📋 サーバー: ${guild.name} (ID: ${guild.id})`);
+            
             const invites = await guild.invites.fetch();
             const inviteMap = new Map();
             
-            invites.forEach(invite => {
-                inviteMap.set(invite.code, invite.uses || 0);
-            });
+            if (invites.size === 0) {
+                console.log('  ❌ 招待リンクが存在しません');
+            } else {
+                console.log(`  ✅ ${invites.size}個の招待リンクを発見:`);
+                
+                invites.forEach(invite => {
+                    inviteMap.set(invite.code, invite.uses || 0);
+                    
+                    // 招待リンクの詳細情報を表示
+                    const isConfigured = INVITE_ROLE_CONFIG[invite.code] ? '🎯 設定済み' : '⚪ 未設定';
+                    const channelName = invite.channel ? invite.channel.name : '不明';
+                    const inviterName = invite.inviter ? invite.inviter.tag : '不明';
+                    const maxUses = invite.maxUses === 0 ? '無制限' : invite.maxUses;
+                    const expiresAt = invite.expiresAt ? invite.expiresAt.toLocaleString('ja-JP') : '無期限';
+                    
+                    console.log(`    ${isConfigured} コード: ${invite.code}`);
+                    console.log(`      📊 使用回数: ${invite.uses || 0}/${maxUses}`);
+                    console.log(`      🌐 リンク: https://discord.gg/${invite.code}`);
+                    console.log(`      📺 チャンネル: #${channelName}`);
+                    console.log(`      👤 作成者: ${inviterName}`);
+                    console.log(`      ⏰ 期限: ${expiresAt}`);
+                    
+                    // 設定されているコードかチェック
+                    if (INVITE_ROLE_CONFIG[invite.code]) {
+                        const roleId = INVITE_ROLE_CONFIG[invite.code];
+                        const role = guild.roles.cache.get(roleId);
+                        if (role) {
+                            console.log(`      🎭 付与ロール: "${role.name}" (ID: ${roleId})`);
+                        } else {
+                            console.log(`      ❌ ロールエラー: ID "${roleId}" が見つかりません`);
+                        }
+                    }
+                    console.log(''); // 空行
+                });
+            }
             
             serverInvites.set(guild.id, inviteMap);
-            console.log(`✅ ${guild.name}: ${invites.size}個の招待リンクをキャッシュ`);
+            
+            // 設定されているが存在しない招待コードをチェック
+            console.log('  🔍 設定チェック:');
+            let configuredButMissing = [];
+            for (const configuredCode of Object.keys(INVITE_ROLE_CONFIG)) {
+                if (!inviteMap.has(configuredCode)) {
+                    configuredButMissing.push(configuredCode);
+                }
+            }
+            
+            if (configuredButMissing.length > 0) {
+                console.log(`  ⚠️ 設定されているが存在しない招待コード: ${configuredButMissing.join(', ')}`);
+            } else if (Object.keys(INVITE_ROLE_CONFIG).length > 0) {
+                console.log('  ✅ 設定されている招待コードは全て存在します');
+            }
             
         } catch (error) {
             console.error(`❌ ${guild.name} の招待リンク取得失敗:`, error.message);
         }
     }
     
-    console.log('🚀 準備完了！新メンバーの参加を監視中...');
-    console.log('📝 設定確認:', Object.keys(INVITE_ROLE_CONFIG).length, '個の招待コードが設定済み');
+    console.log('\n🚀 準備完了！新メンバーの参加を監視中...');
+    console.log('=' .repeat(50));
 });
 
-// ===== 新メンバー参加時の処理 =====
 // ===== 新メンバー参加時の処理 =====
 client.on('guildMemberAdd', async (member) => {
     console.log(`👋 ${member.user.tag} が ${member.guild.name} に参加しました`);
