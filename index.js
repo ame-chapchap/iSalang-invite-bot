@@ -142,7 +142,7 @@ client.on('guildMemberAdd', async (member) => {
         // 🔍 デバッグ: 現在の招待リンク一覧を表示
         console.log('📋 現在の招待リンク:');
         currentInvites.forEach(invite => {
-            console.log(`  - ${invite.code}: ${invite.uses}回`);
+            console.log(`  - ${invite.code}: ${invite.uses || 0}回`);
         });
         
         // 🔍 デバッグ: 設定されている招待コードを表示
@@ -152,16 +152,20 @@ client.on('guildMemberAdd', async (member) => {
         let usedInviteCode = null;
         
         console.log('🔍 招待リンクの使用回数をチェック中...');
-        for (const [code, currentUses] of currentInvites) {
+        
+        // 🛠️ 修正: 正しいループ処理
+        currentInvites.forEach(invite => {
+            const code = invite.code;
+            const currentUses = invite.uses || 0;
             const cachedUses = cachedInvites.get(code) || 0;
+            
             console.log(`  - ${code}: キャッシュ=${cachedUses}, 現在=${currentUses}, 変化=${currentUses > cachedUses ? 'あり' : 'なし'}`);
             
             if (currentUses > cachedUses) {
                 usedInviteCode = code;
                 console.log(`🎯 使用された招待コード特定: ${code} (${cachedUses} → ${currentUses})`);
-                break;
             }
-        }
+        });
         
         if (usedInviteCode) {
             console.log(`✅ 使用された招待コード: ${usedInviteCode}`);
