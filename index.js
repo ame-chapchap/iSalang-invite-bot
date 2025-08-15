@@ -54,6 +54,7 @@ client.once('ready', async () => {
 });
 
 // ===== 新メンバー参加時の処理 =====
+// ===== 新メンバー参加時の処理 =====
 client.on('guildMemberAdd', async (member) => {
     console.log(`👋 ${member.user.tag} が ${member.guild.name} に参加しました`);
     
@@ -66,28 +67,49 @@ client.on('guildMemberAdd', async (member) => {
             return;
         }
         
+        // 🔍 デバッグ: キャッシュされた招待リンク一覧を表示
+        console.log('📋 キャッシュされた招待リンク:');
+        cachedInvites.forEach((uses, code) => {
+            console.log(`  - ${code}: ${uses}回`);
+        });
+        
         // 現在の招待リンク一覧を取得
         const currentInvites = await guild.invites.fetch();
+        
+        // 🔍 デバッグ: 現在の招待リンク一覧を表示
+        console.log('📋 現在の招待リンク:');
+        currentInvites.forEach(invite => {
+            console.log(`  - ${invite.code}: ${invite.uses}回`);
+        });
+        
+        // 🔍 デバッグ: 設定されている招待コードを表示
+        console.log('⚙️ 設定されている招待コード:', Object.keys(INVITE_ROLE_CONFIG));
         
         // 使用回数が増えた招待リンクを特定
         let usedInviteCode = null;
         
+        console.log('🔍 招待リンクの使用回数をチェック中...');
         for (const [code, currentUses] of currentInvites) {
             const cachedUses = cachedInvites.get(code) || 0;
+            console.log(`  - ${code}: キャッシュ=${cachedUses}, 現在=${currentUses}, 変化=${currentUses > cachedUses ? 'あり' : 'なし'}`);
             
             if (currentUses > cachedUses) {
                 usedInviteCode = code;
-                console.log(`🔍 使用された招待コード: ${code} (${cachedUses} → ${currentUses})`);
+                console.log(`🎯 使用された招待コード特定: ${code} (${cachedUses} → ${currentUses})`);
                 break;
             }
         }
         
         if (usedInviteCode) {
+            console.log(`✅ 使用された招待コード: ${usedInviteCode}`);
+            
             // 招待コードに対応するロールを取得
             const roleId = INVITE_ROLE_CONFIG[usedInviteCode];
+            console.log(`🔍 設定確認: ${usedInviteCode} → ロールID: ${roleId}`);
             
             if (roleId) {
                 const role = guild.roles.cache.get(roleId);
+                console.log(`🔍 ロール検索結果:`, role ? `"${role.name}"` : 'ロールが見つかりません');
                 
                 if (role) {
                     try {
@@ -113,6 +135,7 @@ client.on('guildMemberAdd', async (member) => {
             }
         } else {
             console.log('❓ 使用された招待リンクを特定できませんでした');
+            console.log('💡 すべての招待リンクで使用回数の変化が検出されませんでした');
         }
         
         // キャッシュを更新
@@ -121,6 +144,12 @@ client.on('guildMemberAdd', async (member) => {
             newInviteMap.set(invite.code, invite.uses || 0);
         });
         serverInvites.set(guild.id, newInviteMap);
+        
+        // 🔍 デバッグ: 更新後のキャッシュを表示
+        console.log('🔄 キャッシュ更新完了:');
+        newInviteMap.forEach((uses, code) => {
+            console.log(`  - ${code}: ${uses}回`);
+        });
         
     } catch (error) {
         console.error('❌ メンバー参加処理エラー:', error);
